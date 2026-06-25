@@ -56,6 +56,23 @@ pipeline {
                     env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.SHORT_COMMIT}"
                     echo "Building revision: ${env.GIT_COMMIT}"
                     echo "Image tag: ${env.IMAGE_TAG}"
+
+                    // Detect which services changed
+                    def changes = sh(script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "all"', returnStdout: true).trim()
+                    def changedServices = []
+                    for (svc in SERVICES) {
+                        if (changes.contains("src/${svc}/") || changes == "all") {
+                            changedServices.add(svc)
+                        }
+                    }
+                    // If no specific service changed, or root files changed, build all
+                    if (changedServices.isEmpty()) {
+                        echo "No specific service changed or root files modified — building all services"
+                        env.CHANGED_SERVICES = SERVICES.join(',')
+                    } else {
+                        echo "Changed services: ${changedServices.join(', ')}"
+                        env.CHANGED_SERVICES = changedServices.join(',')
+                    }
                 }
             }
         }
@@ -181,8 +198,9 @@ pipeline {
         stage('Build Images') {
             steps {
                 script {
+                    def services = env.CHANGED_SERVICES.split(',')
                     def builds = [:]
-                    for (svc in SERVICES) {
+                    for (svc in services) {
                         def serviceName = svc
                         builds[svc] = {
                             dir("src/${serviceName}") {
@@ -228,7 +246,8 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-creds') {
-                        for (svc in SERVICES) {
+                        def services = env.CHANGED_SERVICES.split(',')
+                        for (svc in services) {
                             sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-${env.IMAGE_TAG}"
                             sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-latest"
                         }
@@ -252,18 +271,17 @@ pipeline {
             steps {
                 script {
                     sh """
-                        git config user.email "jenkins@ecommerce.local"
-                        git config user.name "Jenkins CI"
-
                         rm -rf manifests-repo
                         git clone https://x-access-token:${GITHUB_CREDS_USR}@github.com/yesk993-ops/ecommerce-manifests.git manifests-repo
                         cd manifests-repo
                         git checkout ${MANIFESTS_BRANCH}
+                        git config user.email "jenkins@ecommerce.local"
+                        git config user.name "Jenkins CI"
 
                         KUSTOMIZE="deploy/k8s/overlays/prod/kustomization.yaml"
 
                         echo "Updating image tags to ${env.IMAGE_TAG}"
-                        for svc in ${SERVICES.join(' ')}; do
+                        for svc in ${env.CHANGED_SERVICES}; do
                             sed -i "s|newTag: \${svc}-latest|newTag: \${svc}-${env.IMAGE_TAG}|g" \$KUSTOMIZE
                         done
 
