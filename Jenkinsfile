@@ -307,7 +307,7 @@ pipeline {
 
                         echo "Updating image tags to ${env.IMAGE_TAG}"
                         for svc in ${env.CHANGED_SERVICES}; do
-                            sed -i "s|\(newTag: \${svc}-\)[^ ]*|\1${env.IMAGE_TAG}|" \$KUSTOMIZE
+                            sed -i "s|\\(newTag: \${svc}-\\)[^ ]*|\\1${env.IMAGE_TAG}|" \$KUSTOMIZE
                         done
 
                         echo "Changed files:"
