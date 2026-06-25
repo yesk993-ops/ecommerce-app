@@ -13,7 +13,8 @@
 def APP_REPO_URL   = 'https://github.com/yourorg/ecommerce-app.git'
 def MANIFESTS_REPO = 'https://github.com/yourorg/ecommerce-manifests.git'
 def MANIFESTS_BRANCH = 'main'
-def DOCKER_REGISTRY  = 'docker.io/ecommerce'
+def DOCKER_REGISTRY  = 'docker.io/mydocker3692'
+def DOCKER_REPO     = 'ecommerce-app'
 
 def SERVICES = [
     'auth-service',
@@ -166,8 +167,8 @@ pipeline {
                             dir("src/${serviceName}") {
                                 sh """
                                     docker build \
-                                        -t ${DOCKER_REGISTRY}/${serviceName}:${env.IMAGE_TAG} \
-                                        -t ${DOCKER_REGISTRY}/${serviceName}:latest \
+                                        -t ${DOCKER_REGISTRY}/${DOCKER_REPO}:${serviceName}-${env.IMAGE_TAG} \
+                                        -t ${DOCKER_REGISTRY}/${DOCKER_REPO}:${serviceName}-latest \
                                         .
                                 """
                             }
@@ -188,7 +189,7 @@ pipeline {
                         script {
                             def critical = ['auth-service', 'api-gateway', 'frontend']
                             for (svc in critical) {
-                                sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_REGISTRY}/${svc}:${env.IMAGE_TAG} 2>/dev/null || true"
+                                sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-${env.IMAGE_TAG} 2>/dev/null || true"
                             }
                         }
                     }
@@ -207,8 +208,8 @@ pipeline {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-creds') {
                         for (svc in SERVICES) {
-                            sh "docker push ${DOCKER_REGISTRY}/${svc}:${env.IMAGE_TAG}"
-                            sh "docker push ${DOCKER_REGISTRY}/${svc}:latest"
+                            sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-${env.IMAGE_TAG}"
+                            sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-latest"
                         }
                     }
                 }
