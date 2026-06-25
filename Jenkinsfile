@@ -68,10 +68,10 @@ pipeline {
                     // If no specific service changed, or root files changed, build all
                     if (changedServices.isEmpty()) {
                         echo "No specific service changed or root files modified — building all services"
-                        env.CHANGED_SERVICES = SERVICES.join(',')
+                        env.CHANGED_SERVICES = SERVICES.join(' ')
                     } else {
-                        echo "Changed services: ${changedServices.join(', ')}"
-                        env.CHANGED_SERVICES = changedServices.join(',')
+                        echo "Changed services: ${changedServices.join(' ')}"
+                        env.CHANGED_SERVICES = changedServices.join(' ')
                     }
                 }
             }
@@ -198,7 +198,7 @@ pipeline {
         stage('Build Images') {
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(',')
+                    def services = env.CHANGED_SERVICES.split(' ')
                     def builds = [:]
                     for (svc in services) {
                         def serviceName = svc
@@ -246,7 +246,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-creds') {
-                        def services = env.CHANGED_SERVICES.split(',')
+                        def services = env.CHANGED_SERVICES.split(' ')
                         for (svc in services) {
                             sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-${env.IMAGE_TAG}"
                             sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${svc}-latest"
