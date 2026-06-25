@@ -79,6 +79,25 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+app.get('/api/products/categories', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM products.categories WHERE is_active = true ORDER BY sort_order, name');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Categories error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/products/health', (req, res) => {
+  res.json({ status: 'UP', service: 'product-service', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/products/metrics', async (req, res) => {
+  res.set('Content-Type', prometheus.register.contentType);
+  res.end(await prometheus.register.metrics());
+});
+
 app.get('/api/products/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -122,16 +141,6 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
-app.get('/api/products/categories', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM products.categories WHERE is_active = true ORDER BY sort_order, name');
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Categories error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 app.get('/api/products/:productId/reviews', async (req, res) => {
   try {
     const result = await pool.query(
@@ -142,15 +151,6 @@ app.get('/api/products/:productId/reviews', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
-});
-
-app.get('/api/products/health', (req, res) => {
-  res.json({ status: 'UP', service: 'product-service', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/products/metrics', async (req, res) => {
-  res.set('Content-Type', prometheus.register.contentType);
-  res.end(await prometheus.register.metrics());
 });
 
 app.listen(PORT, () => {

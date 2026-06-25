@@ -39,6 +39,26 @@ const stockLevelGauge = new prometheus.Gauge({
   labelNames: ['product_id']
 });
 
+app.get('/api/inventory/health', (req, res) => {
+  res.json({ status: 'UP', service: 'inventory-service', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/inventory/metrics', async (req, res) => {
+  res.set('Content-Type', prometheus.register.contentType);
+  res.end(await prometheus.register.metrics());
+});
+
+app.get('/api/inventory/low-stock', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM inventory.stock WHERE quantity <= low_stock_threshold ORDER BY quantity ASC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/inventory/:productId', async (req, res) => {
   try {
     const cached = await redis.get(`stock:${req.params.productId}`);
@@ -134,25 +154,7 @@ app.post('/api/inventory/release', async (req, res) => {
   }
 });
 
-app.get('/api/inventory/low-stock', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM inventory.stock WHERE quantity <= low_stock_threshold ORDER BY quantity ASC'
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
-app.get('/api/inventory/health', (req, res) => {
-  res.json({ status: 'UP', service: 'inventory-service', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/inventory/metrics', async (req, res) => {
-  res.set('Content-Type', prometheus.register.contentType);
-  res.end(await prometheus.register.metrics());
-});
 
 async function startConsumer() {
   await consumer.connect();

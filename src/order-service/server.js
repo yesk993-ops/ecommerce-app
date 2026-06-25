@@ -136,6 +136,15 @@ app.get('/api/orders', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/orders/health', (req, res) => {
+  res.json({ status: 'UP', service: 'order-service', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/orders/metrics', async (req, res) => {
+  res.set('Content-Type', prometheus.register.contentType);
+  res.end(await prometheus.register.metrics());
+});
+
 app.get('/api/orders/:id', authenticate, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM orders.orders WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
@@ -171,15 +180,6 @@ app.put('/api/orders/:id/status', authenticate, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
-});
-
-app.get('/api/orders/health', (req, res) => {
-  res.json({ status: 'UP', service: 'order-service', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/orders/metrics', async (req, res) => {
-  res.set('Content-Type', prometheus.register.contentType);
-  res.end(await prometheus.register.metrics());
 });
 
 app.listen(PORT, () => {

@@ -91,6 +91,15 @@ app.post('/api/payments/process', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/payments/health', (req, res) => {
+  res.json({ status: 'UP', service: 'payment-service', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/payments/metrics', async (req, res) => {
+  res.set('Content-Type', prometheus.register.contentType);
+  res.end(await prometheus.register.metrics());
+});
+
 app.get('/api/payments/:orderId', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
@@ -120,15 +129,6 @@ app.post('/api/payments/refund', authenticate, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
-});
-
-app.get('/api/payments/health', (req, res) => {
-  res.json({ status: 'UP', service: 'payment-service', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/payments/metrics', async (req, res) => {
-  res.set('Content-Type', prometheus.register.contentType);
-  res.end(await prometheus.register.metrics());
 });
 
 app.listen(PORT, () => {
