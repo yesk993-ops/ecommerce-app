@@ -10,9 +10,11 @@
 //   → ArgoCD detects drift in manifests repo → auto-syncs to K8s
 // =============================================================================
 
-def APP_REPO_URL   = 'https://github.com/yesk993-ops/ecommerce-app.git'
-def DOCKER_REGISTRY  = 'docker.io/mydocker3692'
-def DOCKER_REPO     = 'ecommerce-app'
+def APP_REPO_URL      = 'https://github.com/yesk993-ops/ecommerce-app.git'
+def MANIFESTS_REPO    = 'https://github.com/yesk993-ops/ecommerce-manifests.git'
+def MANIFESTS_BRANCH  = 'main'
+def DOCKER_REGISTRY   = 'docker.io/mydocker3692'
+def DOCKER_REPO       = 'ecommerce-app'
 
 def SERVICES = [
     'auth-service',
@@ -236,11 +238,12 @@ pipeline {
         }
 
         // =====================================================================
-        // STAGE 8: GitOps — Update K8s Manifests
+        // STAGE 8: GitOps — Update Manifests Repo
         // ---------------------------------------------------------------------
-        // 1. Update image tags in deploy/k8s/overlays/prod/kustomization.yaml
-        // 2. Commit and push back to this repo
-        // 3. ArgoCD detects the change and auto-syncs
+        // 1. Clone the manifests repo
+        // 2. Update image tags in kustomization.yaml
+        // 3. Commit and push
+        // 4. ArgoCD detects the change and auto-syncs
         // =====================================================================
         stage('GitOps - Update Manifests') {
             when {
@@ -252,9 +255,10 @@ pipeline {
                         git config user.email "jenkins@ecommerce.local"
                         git config user.name "Jenkins CI"
 
-                        REPO="https://github.com/yesk993-ops/ecommerce-app.git"
-                        AUTH_REPO="https://x-access-token:${GITHUB_CREDS_USR}@github.com/yesk993-ops/ecommerce-app.git"
-                        git remote set-url origin \$AUTH_REPO
+                        rm -rf manifests-repo
+                        git clone https://x-access-token:${GITHUB_CREDS_USR}@github.com/yesk993-ops/ecommerce-manifests.git manifests-repo
+                        cd manifests-repo
+                        git checkout ${MANIFESTS_BRANCH}
 
                         KUSTOMIZE="deploy/k8s/overlays/prod/kustomization.yaml"
 
@@ -272,9 +276,9 @@ pipeline {
                         Services built from commit ${env.GIT_COMMIT}
                         Pipeline: ${env.BUILD_URL}
                         [skip ci]"
-                        git push origin HEAD:main
+                        git push origin ${MANIFESTS_BRANCH}
 
-                        echo "Successfully updated image tags to ${env.IMAGE_TAG}"
+                        echo "Successfully updated manifests repo with image tag ${env.IMAGE_TAG}"
                     """
                 }
             }
@@ -329,7 +333,7 @@ pipeline {
                     <h2>Build Successful</h2>
                     <p><b>Image Tag:</b> ${env.IMAGE_TAG}</p>
                     <p><b>Commit:</b> ${env.GIT_COMMIT}</p>
-                    <p><b>Manifests:</b> deploy/k8s/overlays/prod (this repo)</p>
+                    <p><b>Manifests Updated:</b> ${MANIFESTS_REPO}</p>
                     <p><b>ArgoCD auto-syncing to Kubernetes...</b></p>
                     <p><a href='${env.BUILD_URL}'>Jenkins Build Log</a></p>
                 """,
