@@ -14,7 +14,6 @@ def APP_REPO_URL   = 'https://github.com/yourorg/ecommerce-app.git'
 def MANIFESTS_REPO = 'https://github.com/yourorg/ecommerce-manifests.git'
 def MANIFESTS_BRANCH = 'main'
 def DOCKER_REGISTRY  = 'docker.io/ecommerce'
-def IMAGE_TAG        = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
 
 def SERVICES = [
     'auth-service',
@@ -30,7 +29,7 @@ def SERVICES = [
 ]
 
 pipeline {
-    agent any
+    agent { label 'ecommerce-agent' }
 
     tools {
         nodejs 'node-20'
@@ -53,7 +52,7 @@ pipeline {
                 script {
                     env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     env.SHORT_COMMIT = env.GIT_COMMIT.take(7)
-                    env.IMAGE_TAG = IMAGE_TAG
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.SHORT_COMMIT}"
                     echo "Building revision: ${env.GIT_COMMIT}"
                     echo "Image tag: ${env.IMAGE_TAG}"
                 }
