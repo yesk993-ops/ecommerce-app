@@ -155,7 +155,28 @@ pipeline {
         }
 
         // =====================================================================
-        // STAGE 5: Build Docker Images
+        // STAGE 5: Ensure Docker Hub Repo Exists
+        // =====================================================================
+        stage('Ensure Docker Repo') {
+            steps {
+                script {
+                    sh """
+                        TOKEN=\$(curl -s -H "Content-Type: application/json" -X POST -d '{"username":"${DOCKER_CREDS_USR}","password":"${DOCKER_CREDS_PSW}"}' https://hub.docker.com/v2/users/login/ | jq -r '.token')
+                        HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: JWT \$TOKEN" https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/)
+                        if [ "\$HTTP_CODE" = "404" ]; then
+                            echo "Creating repository ${DOCKER_CREDS_USR}/${DOCKER_REPO}..."
+                            curl -s -H "Authorization: JWT \$TOKEN" -H "Content-Type: application/json" -X POST -d '{"name":"${DOCKER_REPO}","description":"E-commerce app images","is_private":false}' https://hub.docker.com/v2/repositories/
+                            echo "Repository created."
+                        else
+                            echo "Repository ${DOCKER_CREDS_USR}/${DOCKER_REPO} already exists."
+                        fi
+                    """
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 6: Build Docker Images
         // =====================================================================
         stage('Build Images') {
             steps {
