@@ -1,0 +1,89 @@
+{
+  "title": "E-Commerce Microservices",
+  "uid": "ecommerce-services",
+  "version": 1,
+  "tags": ["ecommerce"],
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "graph",
+      "span": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m])) by (service)",
+          "legendFormat": "{{ service }}"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "span": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "legendFormat": "Error Rate %"
+        }
+      ]
+    },
+    {
+      "title": "P95 Latency",
+      "type": "graph",
+      "span": 6,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "title": "Active Connections",
+      "type": "graph",
+      "span": 6,
+      "targets": [
+        {
+          "expr": "sum(http_active_connections) by (service)",
+          "legendFormat": "{{ service }}"
+        }
+      ]
+    },
+    {
+      "title": "CPU Usage",
+      "type": "graph",
+      "span": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (pod)",
+          "legendFormat": "{{ pod }}"
+        }
+      ]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "graph",
+      "span": 4,
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes) by (pod)",
+          "legendFormat": "{{ pod }}"
+        }
+      ]
+    },
+    {
+      "title": "Disk I/O",
+      "type": "graph",
+      "span": 4,
+      "targets": [
+        {
+          "expr": "rate(container_fs_writes_bytes_total[5m])",
+          "legendFormat": "write"
+        },
+        {
+          "expr": "rate(container_fs_reads_bytes_total[5m])",
+          "legendFormat": "read"
+        }
+      ]
+    }
+  ]
+}

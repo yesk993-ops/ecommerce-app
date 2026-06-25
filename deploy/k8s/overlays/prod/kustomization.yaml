@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ecommerce
+commonLabels:
+  environment: production
+  managed-by: argocd
+resources:
+  - ../../base/auth
+  - ../../base/user
+  - ../../base/product
+  - ../../base/cart
+  - ../../base/order
+  - ../../base/payment
+  - ../../base/inventory
+  - ../../base/notification
+  - ../../base/gateway
+  - ../../base/frontend
+  - ../../base/infra/namespace.yaml
+  - ../../base/infra/configmap.yaml
+  - ../../base/infra/secrets.yaml
+  - ../../base/infra/ingress.yaml
+  - ../../base/infra/rbac.yaml
+images:
+  - name: ecommerce/auth-service
+    newTag: latest
+  - name: ecommerce/user-service
+    newTag: latest
+  - name: ecommerce/product-service
+    newTag: latest
+  - name: ecommerce/cart-service
+    newTag: latest
+  - name: ecommerce/order-service
+    newTag: latest
+  - name: ecommerce/payment-service
+    newTag: latest
+  - name: ecommerce/inventory-service
+    newTag: latest
+  - name: ecommerce/notification-service
+    newTag: latest
+  - name: ecommerce/api-gateway
+    newTag: latest
+  - name: ecommerce/frontend
+    newTag: latest

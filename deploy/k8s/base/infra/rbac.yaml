@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ecommerce-sa
+  namespace: ecommerce
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ecommerce-infra-sa
+  namespace: ecommerce-infra
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ecommerce-pod-reader
+  namespace: ecommerce
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ecommerce-sa-binding
+  namespace: ecommerce
+subjects:
+  - kind: ServiceAccount
+    name: ecommerce-sa
+    namespace: ecommerce
+roleRef:
+  kind: Role
+  name: ecommerce-pod-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ecommerce-hpa
+rules:
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ecommerce-hpa-binding
+subjects:
+  - kind: ServiceAccount
+    name: ecommerce-sa
+    namespace: ecommerce
+roleRef:
+  kind: ClusterRole
+  name: ecommerce-hpa
+  apiGroup: rbac.authorization.k8s.io

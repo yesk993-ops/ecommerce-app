@@ -1,0 +1,79 @@
+---
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0755
+  loop:
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+    - /opt/monitoring/elasticsearch
+    - /opt/monitoring/logstash
+
+- name: Copy Prometheus config
+  copy:
+    src: prometheus.yml
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    mode: 0644
+
+- name: Deploy Prometheus Docker container
+  docker_container:
+    name: prometheus
+    image: prom/prometheus:v2.51.0
+    state: started
+    restart_policy: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - /opt/monitoring/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+
+- name: Deploy Grafana Docker container
+  docker_container:
+    name: grafana
+    image: grafana/grafana:10.4.0
+    state: started
+    restart_policy: always
+    ports:
+      - "3030:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+- name: Deploy Elasticsearch
+  docker_container:
+    name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    state: started
+    restart_policy: always
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+- name: Deploy Logstash
+  docker_container:
+    name: logstash
+    image: docker.elastic.co/logstash/logstash:8.12.0
+    state: started
+    restart_policy: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - /opt/monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+
+- name: Deploy Kibana
+  docker_container:
+    name: kibana
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    state: started
+    restart_policy: always
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200

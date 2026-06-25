@@ -1,0 +1,50 @@
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-full-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"
+  template:
+    ttl: "720h"
+    includedNamespaces:
+      - ecommerce
+      - ecommerce-infra
+      - monitoring
+    excludedResources:
+      - pods
+      - events
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: hourly-config-backup
+  namespace: velero
+spec:
+  schedule: "0 * * * *"
+  template:
+    ttl: "168h"
+    includedResources:
+      - configmaps
+      - secrets
+      - deployments
+      - services
+      - ingresses
+    includedNamespaces:
+      - ecommerce
+---
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: dr-restore-test
+  namespace: velero
+spec:
+  backupName: daily-full-backup
+  restorePVs: true
+  restoreStatus:
+    includedResources:
+      - "*"

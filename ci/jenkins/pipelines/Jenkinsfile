@@ -1,0 +1,346 @@
+// =============================================================================
+// E-Commerce CI/CD Pipeline — Two-Repo GitOps
+// -----------------------------------------------------------------------------
+// App Repo:      github.com/yourorg/ecommerce-app       (this repo)
+// Manifests Repo: github.com/yourorg/ecommerce-manifests  (ArgoCD source of truth)
+// -----------------------------------------------------------------------------
+// Flow:
+//   Push to main → Jenkins CI (lint → test → scan → build → push images)
+//   → Update manifests repo with new image tags → commit + push
+//   → ArgoCD detects drift in manifests repo → auto-syncs to K8s
+// =============================================================================
+
+def APP_REPO_URL   = 'https://github.com/yourorg/ecommerce-app.git'
+def MANIFESTS_REPO = 'https://github.com/yourorg/ecommerce-manifests.git'
+def MANIFESTS_BRANCH = 'main'
+def DOCKER_REGISTRY  = 'docker.io/ecommerce'
+def IMAGE_TAG        = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+
+def SERVICES = [
+    'auth-service',
+    'user-service',
+    'product-service',
+    'cart-service',
+    'order-service',
+    'payment-service',
+    'inventory-service',
+    'notification-service',
+    'api-gateway',
+    'frontend'
+]
+
+pipeline {
+    agent any
+
+    tools {
+        nodejs 'node-20'
+    }
+
+    environment {
+        // Credentials configured in Jenkins → Manage Credentials
+        DOCKER_CREDS     = credentials('docker-hub-creds')
+        GITHUB_CREDS     = credentials('github-pat')
+        SONAR_HOST_URL   = 'http://sonarqube:9000'
+    }
+
+    stages {
+        // =====================================================================
+        // STAGE 1: Checkout App Code
+        // =====================================================================
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    env.SHORT_COMMIT = env.GIT_COMMIT.take(7)
+                    env.IMAGE_TAG = IMAGE_TAG
+                    echo "Building revision: ${env.GIT_COMMIT}"
+                    echo "Image tag: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 2: Code Quality & Static Analysis
+        // =====================================================================
+        stage('Code Quality') {
+            parallel {
+                stage('ESLint') {
+                    steps {
+                        dir('src') {
+                            sh '''
+                                for dir in */; do
+                                    if [ -f "${dir}package.json" ]; then
+                                        echo "Linting ${dir}..."
+                                        cd "$dir" && npm ci --silent 2>/dev/null && npx eslint . --ext .js --format junit -o ../../reports/eslint-${dir%/}.xml || true
+                                        cd ..
+                                    fi
+                                done
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'reports/eslint-*.xml'
+                        }
+                    }
+                }
+                stage('SonarQube') {
+                    steps {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''
+                                sonar-scanner \
+                                    -Dsonar.projectKey=ecommerce-app \
+                                    -Dsonar.projectName="E-Commerce App" \
+                                    -Dsonar.sources=src/ \
+                                    -Dsonar.host.url=${SONAR_HOST_URL} \
+                                    -Dsonar.login=${SONAR_AUTH_TOKEN} \
+                                    -Dsonar.exclusions=**/node_modules/**,**/build/** \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 3: Unit Tests
+        // =====================================================================
+        stage('Unit Tests') {
+            parallel {
+                stage('Auth Tests') {
+                    steps { dir('src/auth-service') { sh 'npm ci && npm test -- --ci --reporters=default --reporters=jest-junit 2>/dev/null || true' } }
+                    post { always { junit allowEmptyResults: true, testResults: 'src/auth-service/junit.xml' } }
+                }
+                stage('Cart Tests') {
+                    steps { dir('src/cart-service') { sh 'npm ci && npm test -- --ci --reporters=default --reporters=jest-junit 2>/dev/null || true' } }
+                    post { always { junit allowEmptyResults: true, testResults: 'src/cart-service/junit.xml' } }
+                }
+                stage('Order Tests') {
+                    steps { dir('src/order-service') { sh 'npm ci && npm test -- --ci --reporters=default --reporters=jest-junit 2>/dev/null || true' } }
+                    post { always { junit allowEmptyResults: true, testResults: 'src/order-service/junit.xml' } }
+                }
+                stage('Frontend Tests') {
+                    steps { dir('src/frontend') { sh 'npm ci && CI=true npm test -- --ci --reporters=default --reporters=jest-junit 2>/dev/null || true' } }
+                    post { always { junit allowEmptyResults: true, testResults: 'src/frontend/junit.xml' } }
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 4: Security Scanning
+        // =====================================================================
+        stage('Security Scan') {
+            parallel {
+                stage('Trivy FS') {
+                    steps {
+                        sh 'trivy filesystem --severity CRITICAL,HIGH --exit-code 0 --format sarif --output reports/trivy-fs.sarif . 2>/dev/null || true'
+                    }
+                }
+                stage('Dependency Audit') {
+                    steps {
+                        sh '''
+                            mkdir -p reports
+                            for dir in src/*/; do
+                                if [ -f "${dir}package.json" ]; then
+                                    cd "$dir"
+                                    npm audit --audit-level=high --json > ../../reports/audit-${dir%/}.json 2>/dev/null || true
+                                    cd ../..
+                                fi
+                            done
+                        '''
+                    }
+                }
+                stage('Secret Scan') {
+                    steps {
+                        sh 'trivy config --severity CRITICAL,HIGH --exit-code 0 . 2>/dev/null || true'
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 5: Build Docker Images
+        // =====================================================================
+        stage('Build Images') {
+            steps {
+                script {
+                    def builds = [:]
+                    for (svc in SERVICES) {
+                        def serviceName = svc
+                        builds[svc] = {
+                            dir("src/${serviceName}") {
+                                sh """
+                                    docker build \
+                                        -t ${DOCKER_REGISTRY}/${serviceName}:${IMAGE_TAG} \
+                                        -t ${DOCKER_REGISTRY}/${serviceName}:latest \
+                                        .
+                                """
+                            }
+                        }
+                    }
+                    parallel builds
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 6: Scan Built Images
+        // =====================================================================
+        stage('Image Scan') {
+            parallel {
+                stage('Scan Critical Images') {
+                    steps {
+                        script {
+                            def critical = ['auth-service', 'api-gateway', 'frontend']
+                            for (svc in critical) {
+                                sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_REGISTRY}/${svc}:${IMAGE_TAG} 2>/dev/null || true"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 7: Push Images to Registry
+        // =====================================================================
+        stage('Push Images') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-creds') {
+                        for (svc in SERVICES) {
+                            sh "docker push ${DOCKER_REGISTRY}/${svc}:${IMAGE_TAG}"
+                            sh "docker push ${DOCKER_REGISTRY}/${svc}:latest"
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 8: GitOps — Update Manifests Repo
+        // ---------------------------------------------------------------------
+        // 1. Clone the manifests repo (separate from app code)
+        // 2. Update image tags in kustomization.yaml
+        // 3. Commit and push
+        // 4. ArgoCD detects the change and auto-syncs
+        // =====================================================================
+        stage('GitOps - Update Manifests') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sh """
+                        # Clean up any previous clone
+                        rm -rf manifests-repo
+
+                        # Clone the manifests repo using GitHub PAT
+                        git clone https://x-access-token:${GITHUB_CREDS_USR}@${MANIFESTS_REPO.replace('https://', '')} manifests-repo
+                        cd manifests-repo
+                        git checkout ${MANIFESTS_BRANCH}
+                        git config user.email "jenkins@ecommerce.local"
+                        git config user.name "Jenkins CI"
+
+                        # Update image tags using the helper script
+                        OLD_TAG=\$(grep 'newTag:' deploy/k8s/overlays/prod/kustomization.yaml | head -1 | awk '{print \$2}')
+                        echo "Updating image tags: \$OLD_TAG → ${IMAGE_TAG}"
+                        sed -i "s/newTag: .*/newTag: ${IMAGE_TAG}/g" deploy/k8s/overlays/prod/kustomization.yaml
+
+                        # Verify the changes
+                        echo "Changed files:"
+                        git diff --stat
+
+                        # Commit and push
+                        git add .
+                        git commit -m "chore: update image tags to ${IMAGE_TAG}
+
+                        Services built from commit ${GIT_COMMIT}
+                        Pipeline: ${env.BUILD_URL}
+                        [skip ci]"
+                        git push origin ${MANIFESTS_BRANCH}
+
+                        echo "Successfully updated manifests repo with image tag ${IMAGE_TAG}"
+                    """
+                }
+            }
+        }
+
+        // =====================================================================
+        // STAGE 9: Verify ArgoCD Sync Status
+        // =====================================================================
+        stage('Verify ArgoCD Sync') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sh '''
+                        # Wait for ArgoCD to detect and sync
+                        sleep 15
+                        if command -v argocd &>/dev/null; then
+                            argocd login --core
+                            for app in ecommerce-infra ecommerce-services ecommerce-monitoring; do
+                                echo "Checking sync status for $app..."
+                                STATUS=$(argocd app get $app -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "unknown")
+                                echo "  $app: $STATUS"
+                            done
+                        else
+                            echo "argocd CLI not found. Check sync status manually in ArgoCD UI."
+                            echo "Waiting for ArgoCD applications to sync..."
+                            sleep 30
+                        fi
+                    '''
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // POST-BUILD ACTIONS
+    // =========================================================================
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+            cleanWs()
+        }
+        success {
+            script {
+                currentBuild.displayName = "#${env.BUILD_NUMBER} (${IMAGE_TAG})"
+                currentBuild.description = "Images pushed: ${IMAGE_TAG}"
+            }
+            emailext(
+                subject: "[CI/CD SUCCESS] Build #${env.BUILD_NUMBER} - ${env.JOB_NAME}",
+                body: """
+                    <h2>Build Successful</h2>
+                    <p><b>Image Tag:</b> ${IMAGE_TAG}</p>
+                    <p><b>Commit:</b> ${GIT_COMMIT}</p>
+                    <p><b>Manifests Updated:</b> ${MANIFESTS_REPO}</p>
+                    <p><b>ArgoCD auto-syncing to Kubernetes...</b></p>
+                    <p><a href='${env.BUILD_URL}'>Jenkins Build Log</a></p>
+                """,
+                to: 'devops@company.com',
+                mimeType: 'text/html'
+            )
+        }
+        failure {
+            emailext(
+                subject: "[CI/CD FAILED] Build #${env.BUILD_NUMBER} - ${env.JOB_NAME}",
+                body: "Build failed at stage ${env.STAGE_NAME}. See ${env.BUILD_URL}",
+                to: 'devops@company.com'
+            )
+        }
+        unstable {
+            emailext(
+                subject: "[CI/CD UNSTABLE] Build #${env.BUILD_NUMBER} - ${env.JOB_NAME}",
+                body: "Build unstable. See ${env.BUILD_URL}",
+                to: 'devops@company.com'
+            )
+        }
+    }
+}

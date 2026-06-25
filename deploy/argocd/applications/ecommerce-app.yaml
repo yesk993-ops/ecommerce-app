@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecommerce-infra
+  namespace: argocd
+spec:
+  project: ecommerce
+  source:
+    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    targetRevision: HEAD
+    path: deploy/k8s/base/infra
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ecommerce-infra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecommerce-services
+  namespace: argocd
+spec:
+  project: ecommerce
+  source:
+    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    targetRevision: HEAD
+    path: deploy/k8s/overlays/prod
+    kustomize:
+      namePrefix: prod-
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ecommerce
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecommerce-monitoring
+  namespace: argocd
+spec:
+  project: ecommerce
+  source:
+    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    targetRevision: HEAD
+    path: monitoring/prometheus
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

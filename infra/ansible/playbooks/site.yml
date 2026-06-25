@@ -1,0 +1,30 @@
+---
+- name: Apply common configuration to all hosts
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Configure Docker on all nodes
+  hosts: all
+  become: yes
+  roles:
+    - docker
+
+- name: Setup Kubernetes cluster
+  hosts: k8s_masters:k8s_workers
+  become: yes
+  roles:
+    - k8s
+
+- name: Deploy monitoring stack
+  hosts: monitoring
+  become: yes
+  roles:
+    - monitoring
+
+- name: Configure security baselines
+  hosts: all
+  become: yes
+  roles:
+    - security
