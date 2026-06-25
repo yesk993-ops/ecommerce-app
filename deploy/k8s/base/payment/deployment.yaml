@@ -23,7 +23,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: payment-service
-          image: ecommerce/payment-service:latest
+          image: placeholder/payment-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 4006

@@ -20,7 +20,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: frontend
-          image: ecommerce/frontend:latest
+          image: placeholder/frontend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

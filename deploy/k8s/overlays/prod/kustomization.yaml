@@ -21,23 +21,33 @@ resources:
   - ../../base/infra/ingress.yaml
   - ../../base/infra/rbac.yaml
 images:
-  - name: ecommerce/auth-service
-    newTag: latest
-  - name: ecommerce/user-service
-    newTag: latest
-  - name: ecommerce/product-service
-    newTag: latest
-  - name: ecommerce/cart-service
-    newTag: latest
-  - name: ecommerce/order-service
-    newTag: latest
-  - name: ecommerce/payment-service
-    newTag: latest
-  - name: ecommerce/inventory-service
-    newTag: latest
-  - name: ecommerce/notification-service
-    newTag: latest
-  - name: ecommerce/api-gateway
-    newTag: latest
-  - name: ecommerce/frontend
-    newTag: latest
+  - name: placeholder/auth-service
+    newName: mydocker3692/ecommerce-app
+    newTag: auth-service-latest
+  - name: placeholder/user-service
+    newName: mydocker3692/ecommerce-app
+    newTag: user-service-latest
+  - name: placeholder/product-service
+    newName: mydocker3692/ecommerce-app
+    newTag: product-service-latest
+  - name: placeholder/cart-service
+    newName: mydocker3692/ecommerce-app
+    newTag: cart-service-latest
+  - name: placeholder/order-service
+    newName: mydocker3692/ecommerce-app
+    newTag: order-service-latest
+  - name: placeholder/payment-service
+    newName: mydocker3692/ecommerce-app
+    newTag: payment-service-latest
+  - name: placeholder/inventory-service
+    newName: mydocker3692/ecommerce-app
+    newTag: inventory-service-latest
+  - name: placeholder/notification-service
+    newName: mydocker3692/ecommerce-app
+    newTag: notification-service-latest
+  - name: placeholder/api-gateway
+    newName: mydocker3692/ecommerce-app
+    newTag: api-gateway-latest
+  - name: placeholder/frontend
+    newName: mydocker3692/ecommerce-app
+    newTag: frontend-latest

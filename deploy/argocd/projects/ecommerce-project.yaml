@@ -6,7 +6,7 @@ metadata:
 spec:
   description: E-Commerce Microservices Platform
   sourceRepos:
-    - 'https://github.com/yourorg/ecommerce-service-project.git'
+    - 'https://github.com/yesk993-ops/ecommerce-app.git'
   destinations:
     - namespace: ecommerce
       server: https://kubernetes.default.svc

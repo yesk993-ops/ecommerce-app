@@ -23,7 +23,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: product-service
-          image: ecommerce/product-service:latest
+          image: placeholder/product-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 4003

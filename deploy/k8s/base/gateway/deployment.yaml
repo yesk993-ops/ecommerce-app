@@ -23,7 +23,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: api-gateway
-          image: ecommerce/api-gateway:latest
+          image: placeholder/api-gateway:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80

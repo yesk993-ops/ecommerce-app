@@ -23,7 +23,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: notification-service
-          image: ecommerce/notification-service:latest
+          image: placeholder/notification-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 4008

@@ -6,7 +6,7 @@ metadata:
 spec:
   project: ecommerce
   source:
-    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    repoURL: https://github.com/yesk993-ops/ecommerce-app.git
     targetRevision: HEAD
     path: deploy/k8s/base/infra
   destination:
@@ -28,7 +28,7 @@ metadata:
 spec:
   project: ecommerce
   source:
-    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    repoURL: https://github.com/yesk993-ops/ecommerce-app.git
     targetRevision: HEAD
     path: deploy/k8s/overlays/prod
     kustomize:
@@ -52,7 +52,7 @@ metadata:
 spec:
   project: ecommerce
   source:
-    repoURL: https://github.com/yourorg/ecommerce-service-project.git
+    repoURL: https://github.com/yesk993-ops/ecommerce-app.git
     targetRevision: HEAD
     path: monitoring/prometheus
   destination:

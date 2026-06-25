@@ -23,7 +23,7 @@ spec:
       serviceAccountName: ecommerce-sa
       containers:
         - name: user-service
-          image: ecommerce/user-service:latest
+          image: placeholder/user-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 4002
