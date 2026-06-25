@@ -12,4 +12,4 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN mkdir -p /var/cache/nginx && chown -R appuser:appgroup /var/cache/nginx /usr/share/nginx/html /etc/nginx
 USER appuser
 EXPOSE 3000
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["nginx", "-g", "daemon off; pid /tmp/nginx.pid;"]
