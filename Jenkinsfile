@@ -270,7 +270,7 @@ pipeline {
                         def serviceName = svc
                         sh """
                             TOKEN=\$(curl -s -H "Content-Type: application/json" -X POST -d '{"username":"${DOCKER_CREDS_USR}","password":"${DOCKER_CREDS_PSW}"}' https://hub.docker.com/v2/users/login/ | jq -r '.token')
-                            TAGS=\$(curl -s -H "Authorization: JWT \$TOKEN" "https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/tags/?page_size=100" | jq -r '.results[] | select(.name | startswith("${serviceName}-")) | select(.name | endswith("-latest") | not) | .name' | sort -t- -k3 -V | tail -n +3)
+                            TAGS=\$(curl -s -H "Authorization: JWT \$TOKEN" "https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/tags/?page_size=100" | jq -r '.results[] | select(.name | startswith("${serviceName}-")) | select(.name | endswith("-latest") | not) | .name' | sort -t- -k3 -Vr | tail -n +3)
                             for tag in \$TAGS; do
                                 echo "Deleting old tag: \$tag"
                                 curl -s -X DELETE -H "Authorization: JWT \$TOKEN" "https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/tags/\$tag/"
