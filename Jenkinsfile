@@ -257,6 +257,31 @@ pipeline {
         }
 
         // =====================================================================
+        // STAGE 7b: Cleanup Old Docker Images (keep last 2 per service)
+        // =====================================================================
+        stage('Cleanup Old Images') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    def services = env.CHANGED_SERVICES.split(' ')
+                    for (svc in services) {
+                        def serviceName = svc
+                        sh """
+                            TOKEN=\$(curl -s -H "Content-Type: application/json" -X POST -d '{"username":"${DOCKER_CREDS_USR}","password":"${DOCKER_CREDS_PSW}"}' https://hub.docker.com/v2/users/login/ | jq -r '.token')
+                            TAGS=\$(curl -s -H "Authorization: JWT \$TOKEN" "https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/tags/?page_size=100" | jq -r '.results[] | select(.name | startswith("${serviceName}-")) | select(.name | endswith("-latest") | not) | .name' | sort -r | tail -n +3)
+                            for tag in \$TAGS; do
+                                echo "Deleting old tag: \$tag"
+                                curl -s -X DELETE -H "Authorization: JWT \$TOKEN" "https://hub.docker.com/v2/repositories/${DOCKER_CREDS_USR}/${DOCKER_REPO}/tags/\$tag/"
+                            done
+                        """
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
         // STAGE 8: GitOps — Update Manifests Repo
         // ---------------------------------------------------------------------
         // 1. Clone the manifests repo
@@ -272,7 +297,7 @@ pipeline {
                 script {
                     sh """
                         rm -rf manifests-repo
-                        git clone https://x-access-token:${GITHUB_CREDS_USR}@github.com/yesk993-ops/ecommerce-manifests.git manifests-repo
+                        git clone https://${GITHUB_CREDS_USR}:${GITHUB_CREDS_PSW}@github.com/yesk993-ops/ecommerce-manifests.git manifests-repo
                         cd manifests-repo
                         git checkout ${MANIFESTS_BRANCH}
                         git config user.email "jenkins@ecommerce.local"
