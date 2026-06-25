@@ -166,7 +166,7 @@ pipeline {
                             dir("src/${serviceName}") {
                                 sh """
                                     docker build \
-                                        -t ${DOCKER_REGISTRY}/${serviceName}:${IMAGE_TAG} \
+                                        -t ${DOCKER_REGISTRY}/${serviceName}:${env.IMAGE_TAG} \
                                         -t ${DOCKER_REGISTRY}/${serviceName}:latest \
                                         .
                                 """
@@ -188,7 +188,7 @@ pipeline {
                         script {
                             def critical = ['auth-service', 'api-gateway', 'frontend']
                             for (svc in critical) {
-                                sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_REGISTRY}/${svc}:${IMAGE_TAG} 2>/dev/null || true"
+                                sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_REGISTRY}/${svc}:${env.IMAGE_TAG} 2>/dev/null || true"
                             }
                         }
                     }
@@ -207,7 +207,7 @@ pipeline {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-creds') {
                         for (svc in SERVICES) {
-                            sh "docker push ${DOCKER_REGISTRY}/${svc}:${IMAGE_TAG}"
+                            sh "docker push ${DOCKER_REGISTRY}/${svc}:${env.IMAGE_TAG}"
                             sh "docker push ${DOCKER_REGISTRY}/${svc}:latest"
                         }
                     }
@@ -242,8 +242,8 @@ pipeline {
 
                         # Update image tags using the helper script
                         OLD_TAG=\$(grep 'newTag:' deploy/k8s/overlays/prod/kustomization.yaml | head -1 | awk '{print \$2}')
-                        echo "Updating image tags: \$OLD_TAG → ${IMAGE_TAG}"
-                        sed -i "s/newTag: .*/newTag: ${IMAGE_TAG}/g" deploy/k8s/overlays/prod/kustomization.yaml
+                        echo "Updating image tags: \$OLD_TAG → ${env.IMAGE_TAG}"
+                        sed -i "s/newTag: .*/newTag: ${env.IMAGE_TAG}/g" deploy/k8s/overlays/prod/kustomization.yaml
 
                         # Verify the changes
                         echo "Changed files:"
@@ -251,14 +251,14 @@ pipeline {
 
                         # Commit and push
                         git add .
-                        git commit -m "chore: update image tags to ${IMAGE_TAG}
+                        git commit -m "chore: update image tags to ${env.IMAGE_TAG}
 
-                        Services built from commit ${GIT_COMMIT}
+                        Services built from commit ${env.GIT_COMMIT}
                         Pipeline: ${env.BUILD_URL}
                         [skip ci]"
                         git push origin ${MANIFESTS_BRANCH}
 
-                        echo "Successfully updated manifests repo with image tag ${IMAGE_TAG}"
+                        echo "Successfully updated manifests repo with image tag ${env.IMAGE_TAG}"
                     """
                 }
             }
@@ -304,15 +304,15 @@ pipeline {
         }
         success {
             script {
-                currentBuild.displayName = "#${env.BUILD_NUMBER} (${IMAGE_TAG})"
-                currentBuild.description = "Images pushed: ${IMAGE_TAG}"
+                currentBuild.displayName = "#${env.BUILD_NUMBER} (${env.IMAGE_TAG})"
+                currentBuild.description = "Images pushed: ${env.IMAGE_TAG}"
             }
             emailext(
                 subject: "[CI/CD SUCCESS] Build #${env.BUILD_NUMBER} - ${env.JOB_NAME}",
                 body: """
                     <h2>Build Successful</h2>
-                    <p><b>Image Tag:</b> ${IMAGE_TAG}</p>
-                    <p><b>Commit:</b> ${GIT_COMMIT}</p>
+                    <p><b>Image Tag:</b> ${env.IMAGE_TAG}</p>
+                    <p><b>Commit:</b> ${env.GIT_COMMIT}</p>
                     <p><b>Manifests Updated:</b> ${MANIFESTS_REPO}</p>
                     <p><b>ArgoCD auto-syncing to Kubernetes...</b></p>
                     <p><a href='${env.BUILD_URL}'>Jenkins Build Log</a></p>
