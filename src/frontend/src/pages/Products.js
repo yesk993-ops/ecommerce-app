@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Grid, Card, CardMedia, CardContent, Typography, Button, TextField, InputAdornment,
-  Pagination, Box, Chip, Tabs, Tab, CircularProgress
+  Pagination, Box, Chip, Tabs, Tab, CircularProgress, Alert
 } from '@mui/material';
 import { Search, ShoppingCart } from '@mui/icons-material';
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
@@ -18,23 +18,32 @@ export default function Products() {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [activeCategory, setActiveCategory] = useState(routeCategory || searchParams.get('category') || '');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { user } = useAuth();
   const { addItem, items } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
-    products.categories().then(({ data }) => setCategories(data));
+    products.categories().then(({ data }) => setCategories(data)).catch(() => {});
   }, []);
 
   const fetchProducts = async (page = 1) => {
     setLoading(true);
-    const params = { page, limit: 20 };
-    if (search) params.search = search;
-    if (activeCategory) params.category = activeCategory;
-    const { data: result } = await products.list(params);
-    setData(result.data);
-    setPagination(result.pagination);
-    setLoading(false);
+    setError('');
+    try {
+      const params = { page, limit: 20 };
+      if (search) params.search = search;
+      if (activeCategory) params.category = activeCategory;
+      const { data: result } = await products.list(params);
+      setData(result.data);
+      setPagination(result.pagination);
+    } catch (err) {
+      console.error('Fetch products error:', err);
+      setError('Failed to load products.');
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -68,12 +77,16 @@ export default function Products() {
   const handleAddToCart = async (product, e) => {
     e.stopPropagation();
     if (!user) return navigate('/login');
-    await addItem({
-      productId: product.id,
-      productName: product.name,
-      unitPrice: product.sale_price || product.base_price,
-      imageUrl: product.image_urls?.[0]
-    });
+    try {
+      await addItem({
+        productId: product.id,
+        productName: product.name,
+        unitPrice: product.sale_price || product.base_price,
+        imageUrl: product.image_urls?.[0]
+      });
+    } catch (err) {
+      console.error('Add to cart error:', err);
+    }
   };
 
   const getItemQuantity = (productId) => {
@@ -112,12 +125,14 @@ export default function Products() {
         ))}
       </Tabs>
 
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
       ) : data.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h6" color="text.secondary">No products found</Typography>
-          <Button variant="outlined" onClick={() => { setSearch(''); setActiveCategory(''); }} sx={{ mt: 2 }}>Clear filters</Button>
+          <Button variant="outlined" onClick={() => { setSearch(''); setActiveCategory(''); setSearchParams({}); }} sx={{ mt: 2 }}>Clear filters</Button>
         </Box>
       ) : (
         <>

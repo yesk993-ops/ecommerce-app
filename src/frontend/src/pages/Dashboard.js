@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardMedia, CardContent, Button, TextField, InputAdornment,
-  CircularProgress, Chip, Container
+  CircularProgress, Chip
 } from '@mui/material';
-import { Search, Bolt, LocalShipping, Security, CurrencyRupee, ArrowForward } from '@mui/icons-material';
+import { Search, Bolt, LocalShipping, Security, AttachMoney, ArrowForward } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { products } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [featured, setFeatured] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { user } = useAuth();
   const { addItem } = useCart();
   const navigate = useNavigate();
@@ -26,6 +27,10 @@ export default function Dashboard() {
       setCategories(catRes.data);
       setFeatured(prodRes.data.data);
       setLoading(false);
+    }).catch((err) => {
+      console.error('Dashboard load error:', err);
+      setError('Failed to load products. Please try again.');
+      setLoading(false);
     });
   }, []);
 
@@ -37,12 +42,16 @@ export default function Dashboard() {
   const handleAddToCart = async (product, e) => {
     e.stopPropagation();
     if (!user) return navigate('/login');
-    await addItem({
-      productId: product.id,
-      productName: product.name,
-      unitPrice: product.sale_price || product.base_price,
-      imageUrl: product.image_urls?.[0]
-    });
+    try {
+      await addItem({
+        productId: product.id,
+        productName: product.name,
+        unitPrice: product.sale_price || product.base_price,
+        imageUrl: product.image_urls?.[0]
+      });
+    } catch (err) {
+      console.error('Add to cart error:', err);
+    }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
@@ -83,12 +92,16 @@ export default function Dashboard() {
         </Box>
       </Box>
 
+      {error && (
+        <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>{error}</Typography>
+      )}
+
       <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
         {[
           { icon: <Bolt />, label: '10 Min Delivery', desc: 'Lightning fast' },
           { icon: <LocalShipping />, label: 'Free Shipping', desc: 'Orders over $50' },
           { icon: <Security />, label: 'Secure Payment', desc: '100% protected' },
-          { icon: <CurrencyRupee />, label: 'Best Prices', desc: 'Daily deals' }
+          { icon: <AttachMoney />, label: 'Best Prices', desc: 'Daily deals' }
         ].map((f) => (
           <Box key={f.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'white', p: 2, borderRadius: 2, flex: 1, minWidth: 160, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <Box sx={{ color: '#6c3bcf', display: 'flex' }}>{f.icon}</Box>
